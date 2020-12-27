@@ -1,12 +1,17 @@
 import concurrent.futures
+import multiprocessing
 from multiprocessing import Pipe
 import time
 
-def algoritm(i, numbers, result):
+def algoritm(i, numbers, result, q):
     for j in range(i+1, len(numbers)-i):
+        q.put(result[i+j])
         if numbers[i+j] % numbers[i] == 0:
             result[i+j] = 1
     return result
+
+def progress(q, i, numbers):
+        print(f'Вычисление для числа {numbers[i]}: {q.get()} из {len(numbers)}')
 
 
 if __name__ == '__main__':
@@ -36,8 +41,14 @@ if __name__ == '__main__':
                     resultProcess1 = [0 for i in range(2, quantity)]
                     resultProcess2 = [0 for i in range(2, quantity)]
                     with concurrent.futures.ProcessPoolExecutor() as executor:
-                        resultProcesses.append(executor.submit(algoritm, i, numbers, resultProcess1))
-                        resultProcesses.append(executor.submit(algoritm, j, numbers, resultProcess2))
+                        progress1 = multiprocessing.Queue()
+                        progress2 = multiprocessing.Queue()
+
+                        resultProcesses.append(executor.submit(algoritm, i, numbers, resultProcess1, progress1))  #процессы с рассчетами
+                        resultProcesses.append(executor.submit(algoritm, j, numbers, resultProcess2, progress2))
+
+                        executor.submit(progress, progress1, i, numbers)   # процессы для мониторинга прогресса
+                        executor.submit(progress, progress2, j, numbers)
 
                         concurrent.futures.as_completed(resultProcesses)
 
